@@ -10,7 +10,6 @@ npm install
 
 # serve with hot reload at localhost:8080
 start:   
-````
 npm run dev
 ````
 
