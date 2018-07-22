@@ -1,4 +1,4 @@
-# together
+# Together App
 
 > A Vue.js project
 
@@ -13,12 +13,12 @@ start:
 npm run dev
 ````
 
-## build for production with minification
+## Build for production with minification
 ```
 npm run build
 ````
 
-## build for production and view the bundle analyzer report
+## Build for production and view the bundle analyzer report
 ```
 npm run build --report
 ````
