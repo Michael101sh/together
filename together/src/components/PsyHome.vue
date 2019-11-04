@@ -40,26 +40,33 @@
                     <th> סימון כפסיכולוג </th>
                     <th>מחיקת משתמש</th>
                 </tr>
-                <tr v-for="element in users">
-                    <td> {{element.name}} </td>
-                    <td> {{element.nickname}} </td>
-                    <td> {{element.email}} </td>
-                    <td> {{element.phone}} </td>
-                    <td> <click-confirm>
-                        <input type="checkbox"
-                                v-on:click="isConfirmed(element._id,
-                                 element.isVerified)"
-                                :checked="element.isVerified === true">
-                        </click-confirm> </td>
-                    <td> <click-confirm>
-                        <input type="checkbox" v-on:click="isPsy(element._id,
-                                 element.isPsychologist)"
-                                 :checked="element.isPsychologist === true">
-                    </click-confirm> </td>
-                    <td> <click-confirm>
-                        <button v-on:click="deleteUser(element._id)">
+                <tr v-for="user in users" :key="`${user.nickname}`">
+                    <td> {{user.name}} </td>
+                    <td> {{user.nickname}} </td>
+                    <td> {{user.email}} </td>
+                    <td> {{user.phone}} </td>
+                    <td> 
+                        <!-- <click-confirm> -->
+                            <input type="checkbox"
+                                v-on:click="isConfirmed(user._id,
+                                 user.isVerified)"
+                                :checked="user.isVerified === true">
+                        <!-- </click-confirm> -->
+                         </td>
+                    <td> 
+                        <!-- <click-confirm> -->
+                        <input type="checkbox" v-on:click="isPsy(user._id,
+                                 user.isPsychologist)"
+                                 :checked="user.isPsychologist === true">
+                    <!-- </click-confirm> -->
+                     </td>
+                    <td>
+                         <!-- <click-confirm> -->
+                        <button v-on:click="deleteUser(user._id)">
                         {{deleteMessage}}
-                        </button> </click-confirm> </td>
+                        </button>
+                         <!-- </click-confirm> -->
+                          </td>
                 </tr>
             </table>
         </div>
@@ -75,24 +82,30 @@
                     <th>האם טופל</th>
                     <th> מחיקת פנייה</th>
                 </tr>
-                <tr v-for="element in chats"
-                    v-bind:class="{'critical': element.critical}">
-                    <td> <strong> {{element.priority}} </strong> </td>
-                    <td> {{element.content[0].userName}} </td>
-                    <td> {{element.content[0].userNickname}} </td>
-                    <td> <a v-bind:href="'#/chat?id=' + String(element._id)"> קישור
+                <tr v-for="chat in chats" :key="`${chat._id}`"
+                    v-bind:class="{'critical': chat.critical}">
+                    <td> <strong> {{chat.priority}} </strong> </td>
+                    <td> {{chat.content[0].userName}} </td>
+                    <td> {{chat.content[0].userNickname}} </td>
+                    <td> <a v-bind:href="'#/chat?id=' + String(chat._id)"> קישור
                     </a> </td>
-                    <td> {{element.content[0].date}} </td>
-                    <td> {{element.feel}} </td>
-                    <td> <click-confirm><input type="checkbox"
-                                v-on:click="setTreat(element._id,
-                                 element.wasTreated)"
-                                :checked="element.wasTreated === true">
-                        </click-confirm> </td>
-                    <td> <click-confirm>
-                        <button v-on:click="deleteChat(element._id)">
+                    <td> {{chat.content[0].date}} </td>
+                    <td> {{chat.feel}} </td>
+                    <td>
+                         <!-- <click-confirm> -->
+                        <input type="checkbox"
+                                v-on:click="setTreat(chat._id,
+                                 chat.wasTreated)"
+                                :checked="chat.wasTreated === true">
+                        <!-- </click-confirm> -->
+                         </td>
+                    <td>
+                         <!-- <click-confirm> -->
+                        <button v-on:click="deleteChat(chat._id)">
                         {{deleteMessage}}
-                        </button> </click-confirm> </td>
+                        </button> 
+                        <!-- </click-confirm>  -->
+                        </td>
                 </tr>
             </table>
         </div>
@@ -104,15 +117,17 @@
 <script>
     import * as $ from "jquery";
     import { store } from '../store.js';
-    import swal from 'sweetalert2'
+    import swal from 'sweetalert2';
+    import {getUsers} from "../services/user.service.js";
+    import {getChats} from "../services/chat.service.js";
 
     export default {
         name: 'psyHome',
 
         data () {
             return {
-                chats: this.getChats(),
-                users: this.getUsers(),
+                chats: this.getAllChats(),
+                users: getUsers(this.setUsers),
                 store: store,
                 isInside: store.state.user ? true : false,
                 isPsyc: store.state.user.isPsychologist ? true : false,
@@ -122,19 +137,20 @@
             }
         },
         methods: {
-            getChats () {
-                $.ajax({
-                    url: 'http://' +
-                    location.hostname + ':3003/data/chat',
-                    type:"GET",
-                    contentType:"application/json; charset=utf-8",
-                    dataType:"json"
-                }).then(res => {
-                    this.chats=this.addPriority(res.filter(function (entry) {
+            getAllChats () {
+                getChats(this.applyFilteredPriority, true);
+                getChats(this.applyFilteredPriority, false);
+            },
+            filterChats(data) {
+                if (!this.chats) {
+                    this.chats = [];
+                }
+                return this.chats.concat(data.filter(function (entry) {
                         return entry.content[0].userNickname !== 'מערכת';
-                    }));
-                });
-                return [];
+                }));
+            },
+            applyFilteredPriority(data) {
+                this.addPriority(this.filterChats(data));
             },
             stringToDate(str) {
                 let index = str.indexOf('/');
@@ -152,7 +168,7 @@
                 let minutes = Number(str);
                 return new Date(year, month, day, hours, minutes, 0, 0);
             },
-            addPriority (list) {
+            addPriority(list) {
                 let now = new Date();
                 /* todayStartTime and yesEndTime is defining the
                  the working hours.
@@ -256,25 +272,18 @@
                 for (let i = 0, len = list.length; i < len; i++) {
                     list[i].priority = i + 1;
                 }
-                return list;
+                this.chats = list;
+                // return list;
             },
-            getUsers() {
-                $.ajax({
-                    url: 'http://' +
-                    location.hostname + ':3003/data/user',
-                    type:"GET",
-                    contentType:"application/json; charset=utf-8",
-                    dataType:"json"
-                }).then(res => {
-                    this.users=res;
-                });
-                return [];
+            setUsers(users) {
+                this.users=users;
             },
             isConfirmed(id, isVerified){
+                console.log("isConfirmed called")
                 isVerified = (null !== isVerified) ? !isVerified : true;
                 $.ajax({
                     url: 'http://' +
-                    location.hostname + ':3003/api/setConfirmation/'
+                    location.hostname + ':3003/api/users/setConfirmation/'
                      + String(id),
                     type:"PATCH",
                     method: 'patch',
@@ -309,7 +318,7 @@
                 isPsychologist = (null !== isPsychologist) ? !isPsychologist : true;
                 $.ajax({
                     url: 'http://' +
-                    location.hostname + ':3003/api/setPsyc/'
+                    location.hostname + ':3003/api/users/setPsyc/'
                     + String(id),
                     type:"PATCH",
                     method: 'patch',
@@ -343,7 +352,7 @@
             deleteUser(id) {
                 $.ajax({
                     url: 'http://' +
-                    location.hostname + ':3003/data/user/'
+                    location.hostname + ':3003/api/users/'
                     + String(id),
                     type:"DELETE",
                     dataType:"json"
@@ -352,7 +361,7 @@
             deleteChat(id) {
                 $.ajax({
                     url: 'http://' +
-                    location.hostname + ':3003/data/chat/'
+                    location.hostname + ':3003/api/chats/'
                     + String(id),
                     type: "DELETE",
                     dataType: "json"
@@ -363,7 +372,7 @@
                             '',
                             'success'
                         ).then(function (){
-                                self.getChats();
+                                self.getAllChats();
                             }
                         );
                     })
@@ -401,7 +410,7 @@
                 wasTreated = (null !== wasTreated) ? !wasTreated : true;
                 $.ajax({
                     url: 'http://' +
-                    location.hostname + ':3003/api/setTreatStatus/'
+                    location.hostname + ':3003/api/chats/setTreatStatus/'
                     + String(id),
                     type: "PATCH",
                     method: 'patch',
@@ -417,7 +426,7 @@
                             '',
                             'success'
                         ).then(function () {
-                            self.getChats();
+                            self.getAllChats();
                         }
                         );
                     } else {
@@ -426,7 +435,7 @@
                             '',
                             'success'
                         ).then(function () {
-                                self.getChats();
+                                self.getAllChats();
                             }
                         );
                     }
@@ -489,6 +498,10 @@
   .design{
       display:inline-block;
       margin-right: 50px;
+  }
+  img.icon {
+        width: 120px;
+        height: 120px;
   }
 
   img.forum {

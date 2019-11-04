@@ -83,6 +83,8 @@
 <script>
     import { store } from '../store.js';
     import HomeNav from '../components/HomeNav.vue'
+    import {date} from "../utilities/date.js";
+    import {sendMessage} from "../services/chat.service.js"
 
     export default {
       name: 'telling',
@@ -123,26 +125,6 @@
         forumRef () {
               location.href = '#/forum'
         },
-        date() {
-            let date = new Date();
-            let fix = '';
-            let fix2 = '';
-            let minutes = date.getMinutes();
-            if (minutes === 0) {
-                fix = '0';
-            } else {
-                if (minutes < 10) {
-                    fix2 = '0';
-                }
-            }
-            date =
-                String(date.getDate()) + '/' +
-                String(date.getMonth() + 1) + '/' +
-                String(date.getFullYear()) + '\n' +
-                String(date.getHours()) + ':' +
-                fix2 + String(date.getMinutes()) + fix;
-            return date.toString();
-        },
         textBoxValidation () {
             if (this.callText !== '') {
                 return true;
@@ -151,13 +133,15 @@
         },
         afterPost(flag) {
             if (flag) {
+                this.publishTitle = '';
+                this.callText = '';
                 this.sendingStatus = true;
                 this.sendMessage = 'הפנייה נשלחה בהצלחה.';
             } else {
                 this.sendMessage = 'שליחת הפנייה לא הצליחה, נסה שוב.';
             }
         },
-        sendCall (callback) {
+        sendCall(callback) {
             if (!this.textBoxValidation()) {
                return false;
             }
@@ -188,23 +172,14 @@
             let message = {userName: store.state.user.name,
                 userNickname: userNickname,
                 content: this.callText,
-                date: this.date()};
-            $.ajax({
-                url: 'http://' +
-                    location.hostname + ':3003/api/sendMessage',
-                type:"POST",
-                data:JSON.stringify({title: title,
-                content:[message], isPublic: this.isPublic, feel:this.feel,
-                isLocked: isLocked, wasTreated: wasTreated}),
-                contentType:"application/json; charset=utf-8",
-                dataType:"json"
-            }).done(function (){
-                store.commit('setFeeling', 999);
-                callback(true);
-            }).fail(function () {
-                callback(false)
-            });
-        },
+                date: date()
+            };
+            const data  = {title: title,
+                    content: [message], feel: this.feel, isPublic: this.isPublic,
+                    isLocked: isLocked, wasTreated: wasTreated
+            };
+            sendMessage(data, callback, store);
+          },
           privacy(){
             this.isPublic = !this.isPublic;
           },

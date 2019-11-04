@@ -12,14 +12,14 @@
                v-on:input="showRelevantChats">
         <br><br><br>
         <div class="row chat-container">
-            <div v-for="element in relevantChats" :key="element._id"
+            <div v-for="element in relevantChats" :key="`${element._id}`"
                 class="col-6 col-sm-4 col-md-3 chatWrap">
                 <div class="chat">
                     <div class="chatBody">
                         <strong class="title">
                             {{element.title}} </strong>
                          <br>
-                         <div v-for="message in element.content" :key="message">
+                         <div v-for="(message, index) in element.content" :key="`${index}`">
                                 <strong> {{message.userNickname + ': '}} </strong>
                              {{message.content}}
                          <br> <br>
@@ -45,6 +45,8 @@
     import Chat from '../components/Chat.vue';
     import HomeNav from '../components/HomeNav.vue'
     import swal from 'sweetalert2'
+    import {getChats, sendReply} from "../services/chat.service.js";
+    import {date} from "../utilities/date.js";
 
     export default {
         name: 'forum',
@@ -53,7 +55,7 @@
         },
         data () {
             return {
-                chats: this.getChats(),
+                chats: getChats(this.initChats, true),
                 searchQuery: '',
                 relevantChats: [],
                 store: store,
@@ -66,20 +68,6 @@
         methods: {
             onChatClick(chatId) {
                 location.href = '#/chat?id=' + String(chatId);
-            },
-            getChats () {
-                $.ajax({
-                    url: 'http://' +
-                    location.hostname + ':3003/data/chat',
-                    type:"GET",
-                    data:'query=' +
-                        JSON.stringify({isPublic:true}),
-                    contentType:"application/json; charset=utf-8",
-                    dataType:"json"
-                }).then(res => {
-                    this.initChats(res);
-                });
-                return [];
             },
             initChats (chats) {
                 this.relevantChats = chats;
@@ -112,74 +100,47 @@
                     cancelButtonText: 'ביטול',
                     reverseButtons: true,
                     showLoaderOnConfirm: true,
-                    preConfirm: function (text) {
+                    allowOutsideClick: false,
+                    preConfirm: (text) => {
                         return new Promise(function (resolve, reject) {
                             setTimeout(function() {
                                 if (text === '') {
-                                    reject('אי אפשר לשלוח פנייה ריקה')
+                                    reject('אי אפשר לשלוח תגובה ריקה')
                                 } else {
                                     resolve()
                                 }
                             }, 1000)
                         })
-                    },
-                    allowOutsideClick: false,
-                }).then(function (text) {
-                    self.sendCall(self.afterPost, text);
-                })
-            },
-            date() {
-                let date = new Date();
-                let fix = '';
-                let fix2 = '';
-                let minutes = date.getMinutes();
-                if (minutes === 0) {
-                    fix = '0';
-                } else {
-                    if (minutes < 10) {
-                        fix2 = '0';
+                        .catch((err) =>{
+                          swal.showValidationMessage(
+                                `${err}`
+                            )
+                        })
                     }
-                }
-                date =
-                    String(date.getDate()) + '/' +
-                    String(date.getMonth() + 1) + '/' +
-                    String(date.getFullYear()) + '\n' +
-                    String(date.getHours()) + ':' +
-                    fix2 + String(date.getMinutes()) + fix;
-                return date.toString();
+                })
+                .then((res) => {
+                    if (res.value) {
+                        self.sendCall(self.afterPost, res.value);
+                    } else if(res.dismiss == 'cancel'){
+                        console.log('cancel');
+                    }
+                })
             },
             sendCall (callback, callText) {
                 let isPsychologist = store.state.user.isPsychologist;
                 let nickName = '';
                 let gender = store.state.user.gender;
                 if (isPsychologist) {
-                    if (gender === 'בן') {
-                        nickName = 'הפסיכולוג ' + store.state.user.nickname;
-                    } else {
-                        nickName = 'הפסיכולוגית ' + store.state.user.nickname;
-                    }
+                    nickName = 'הפסיכולוג/ית ' + store.state.user.nickname;
                 } else {
                     nickName = store.state.user.nickname;
                 }
                 let message = {userName: store.state.user.name,
                     userNickname: nickName,
                     content: callText,
-                    date: this.date()};
-                $.ajax({
-                    url: 'http://' +
-                    location.hostname + ':3003/api/addMessage/'
-                    + String(this.chatId),
-                    type:"PATCH",
-                    method: 'patch',
-                    data: JSON.stringify
-                    ({message: message, _method: "PATCH"}),
-                    contentType:"application/json; charset=utf-8",
-                    dataType:"json"
-                }).done(function (){
-                    callback(true);
-                }).fail(function () {
-                    callback(false)
-                });
+                    date: date()
+                };
+                sendReply(this.chatId, message, callback);
             },
             afterPost(flag) {
                 if (flag) {
@@ -189,7 +150,7 @@
                         type: 'success',
                         timer: 2000
                     });
-                    this.getChats();
+                    getChats(this.initChats, true);
                 } else {
                     swal({
                         title: 'שליחת התגובה לא הצליחה, יש לנסות שוב',

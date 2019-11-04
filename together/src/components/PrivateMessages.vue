@@ -11,14 +11,14 @@
         <input type="text" v-model="searchQuery"
                v-on:input="showRelevantChats">
         <div class="row chat-container">
-            <div v-for="element in relevantChats" :key="element"
+            <div v-for="element in relevantChats" :key="`${element._id}`"
                  class="col-6 col-sm-4 col-md-3 chatWrap">
                 <div class="chat">
                     <div class="chatBody">
                         <strong class="title">
                             {{element.title}} </strong>
                         <br>
-                        <div v-for="message in element.content" :key="message">
+                        <div v-for="(message, index) in element.content" :key="`${index}`">
                             <strong> {{message.userNickname + ': '}} </strong>
                             {{message.content}}
                             <br> <br>
@@ -45,6 +45,8 @@
     import Chat from '../components/Chat.vue';
     import HomeNav from '../components/HomeNav.vue'
     import swal from 'sweetalert2'
+    import {date} from "../utilities/date.js";
+    import {getChats, sendReply} from "../services/chat.service.js";
 
     export default {
         name: 'privateMessages',
@@ -53,7 +55,7 @@
         },
         data () {
             return {
-                chats: this.getChats(),
+                chats: getChats(this.setChats, false),
                 searchQuery: '',
                 relevantChats: [],
                 store: store,
@@ -69,50 +71,18 @@
             onChatClick(chatId) {
                 location.href = '#/chat?id=' + String(chatId);
             },
-            getChats () {
-                $.ajax({
-                    url: 'http://' +
-                    location.hostname + ':3003/data/chat',
-                    type:"GET",
-                    data:'query=' +
-                    JSON.stringify({isPublic:false}),
-                    contentType:"application/json; charset=utf-8",
-                    dataType:"json"
-                }).then(res => {
-                    res.forEach(function(element) {
-                        (element.content).forEach(function (message) {
-                            let date = new Date(message.date);
-                            let fix = '';
-                            let fix2 = '';
-                            let minutes = date.getMinutes();
-                            if (minutes === 0) {
-                                fix = '0';
-                            } else {
-                                if (minutes < 10) {
-                                    fix2 = '0';
-                                }
-                            }
-                            message.date =
-                                String(date.getDate()) + '/' +
-                                String(date.getMonth() + 1) + '/' +
-                                String(date.getFullYear()) + '\n' +
-                                String(date.getHours()) + ':' +
-                                fix2 + String(date.getMinutes()) + fix;
-                        });
+            setChats(data) {
+                if (!this.isPsyc) {
+                    let filteredChats = data.filter(function (entry) {
+                        return entry.content[0].userNickname
+                            === store.state.user.nickname;
                     });
-                    if (!this.isPsyc) {
-                        let filteredChats = res.filter(function (entry) {
-                            return entry.content[0].userNickname
-                                === store.state.user.nickname;
-                        });
-                        this.initChats(filteredChats);
-                    } else {
-                        this.initChats(res);
-                    }
-                });
-                return [];
+                    this.initChats(filteredChats);
+                } else {
+                        this.initChats(data);
+                }
             },
-            initChats (chats) {
+            initChats(chats) {
                 this.relevantChats = chats;
                 this.chats = chats;
                 for (let i = 0; i < this.chats.length; i++) {
@@ -143,7 +113,8 @@
                     cancelButtonText: 'ביטול',
                     reverseButtons: true,
                     showLoaderOnConfirm: true,
-                    preConfirm: function (text) {
+                    allowOutsideClick: false,
+                    preConfirm: (text) => {
                         return new Promise(function (resolve, reject) {
                             setTimeout(function() {
                                 if (text === '') {
@@ -153,48 +124,35 @@
                                 }
                             }, 1000)
                         })
-                    },
-                    allowOutsideClick: false,
-                }).then(function (text) {
-                    self.sendCall(self.afterPost, text);
+                        .catch((err) =>{
+                          swal.showValidationMessage(
+                                `${err}`
+                            )
+                        })
+                    }
+                }).then((res) => {
+                    if (res.value) {
+                        self.sendCall(self.afterPost, res.value);
+                    } else if(res.dismiss == 'cancel'){
+                        console.log('cancel');
+                    }
                 })
-            },
-            date() {
-                let today = new Date();
-                return today.toString();
             },
             sendCall (callback, callText) {
                 let isPsychologist = store.state.user.isPsychologist;
                 let nickName = '';
                 let gender = store.state.user.gender;
                 if (isPsychologist) {
-                    if (gender === 'בן') {
-                        nickName = 'הפסיכולוג ' + store.state.user.nickname;
-                    } else {
-                        nickName = 'הפסיכולוגית ' + store.state.user.nickname;
-                    }
+                    nickName = 'הפסיכולוג/ית ' + store.state.user.nickname;
                 } else {
                     nickName = store.state.user.nickname;
                 }
                 let message = {userName: store.state.user.name,
                     userNickname: nickName,
                     content: callText,
-                    date: this.date()};
-                $.ajax({
-                    url: 'http://' +
-                    location.hostname + ':3003/api/addMessage/'
-                    + String(this.chatId),
-                    type:"PATCH",
-                    method: 'patch',
-                    data: JSON.stringify
-                    ({message: message, _method: "PATCH"}),
-                    contentType:"application/json; charset=utf-8",
-                    dataType:"json"
-                }).done(function (){
-                    callback(true);
-                }).fail(function () {
-                    callback(false)
-                });
+                    date: date()
+                };
+                sendReply(this.chatId, message, callback);
             },
             afterPost(flag) {
                 if (flag) {
@@ -204,7 +162,7 @@
                         type: 'success',
                         timer: 2000
                     });
-                    this.getChats();
+                    getChats(this.setChats, false);
                 } else {
                     swal({
                         title: 'שליחת התגובה לא הצליחה, יש לנסות שוב',

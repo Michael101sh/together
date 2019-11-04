@@ -1,6 +1,6 @@
 <template>
     <div v-on:click="home">
-        <p class="cursor container" v-on:click="home" style="color:blue;">לדף הבית</p>
+        <p class="cursor container" v-on:click="home">לדף הבית</p>
         <img src="/static/home.png" class="homeImg" v-on:click="home">
     </div>
 </template>
@@ -36,11 +36,11 @@
 
 <style scoped>
     div {
-        width: 70px;
-        height: 70px;
-        margin: auto;
+        height: 70px;    }
+    p {
+        color:blue;
+        padding-left: 45px;
     }
-
     p.cursor {
         cursor: pointer;
     }

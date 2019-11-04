@@ -41,6 +41,8 @@
     import { store } from '../store.js';
     import swal from 'sweetalert2'
     import HomeNav from '../components/HomeNav.vue'
+    import {date} from "../utilities/date.js";
+    import {getSpecificChat, sendReply} from "../services/chat.service.js";
 
     export default {
         name: 'chat',
@@ -56,38 +58,11 @@
         methods: {
             getCurrentChat () {
                 let id = this.getChatIdFromUrl();
-                $.ajax({
-                    url: 'http://' +
-                    location.hostname + ':3003/data/chat/' + String(id),
-                    type:"GET",
-                    contentType:"application/json; charset=utf-8",
-                    dataType:"json"
-                }).then(res => {this.chat = res});
-                return {}
+                return getSpecificChat(id, (data) => this.chat = data); 
             },
             getChatIdFromUrl() {
                 let index = (location.hash).indexOf('id=') + 3;
                 return location.hash.substring(index);
-            },
-            date() {
-                let date = new Date();
-                let fix = '';
-                let fix2 = '';
-                let minutes = date.getMinutes();
-                if (minutes === 0) {
-                    fix = '0';
-                } else {
-                    if (minutes < 10) {
-                        fix2 = '0';
-                    }
-                }
-                date =
-                    String(date.getDate()) + '/' +
-                    String(date.getMonth() + 1) + '/' +
-                    String(date.getFullYear()) + '\n' +
-                    String(date.getHours()) + ':' +
-                    fix2 + String(date.getMinutes()) + fix;
-                return date.toString();
             },
             showTextBox(id) {
                 this.callText = '';
@@ -101,20 +76,30 @@
                     cancelButtonText: 'ביטול',
                     reverseButtons: true,
                     showLoaderOnConfirm: true,
-                    preConfirm: function (text) {
+                    allowOutsideClick: false,
+                    preConfirm: (text) => {
                         return new Promise(function (resolve, reject) {
                             setTimeout(function() {
                                 if (text === '') {
-                                    reject('אי אפשר לשלוח פנייה ריקה')
+                                    reject('אי אפשר לשלוח תגובה ריקה')
                                 } else {
                                     resolve()
                                 }
                             }, 1000)
                         })
-                    },
-                    allowOutsideClick: false
-                }).then(function (text) {
-                    self.sendCall(self.afterPost, text);
+                        .catch((err) =>{
+                          swal.showValidationMessage(
+                                `${err}`
+                            )
+                        })
+                    }
+                })
+                .then((res) => {
+                    if (res.value) {
+                        self.sendCall(self.afterPost, res.value);
+                    } else if(res.dismiss == 'cancel'){
+                        console.log('cancel');
+                    }
                 })
             },
             sendCall (callback, callText) {
@@ -128,22 +113,9 @@
                 let message = {userName: store.state.user.name,
                     userNickname: nickName,
                     content: callText,
-                    date: this.date()};
-                $.ajax({
-                    url: 'http://' +
-                    location.hostname + ':3003/api/addMessage/'
-                    + String(this.chatId),
-                    type:"PATCH",
-                    method: 'patch',
-                    data: JSON.stringify
-                    ({message: message, _method: "PATCH"}),
-                    contentType:"application/json; charset=utf-8",
-                    dataType:"json"
-                }).done(function (){
-                    callback(true);
-                }).fail(function () {
-                    callback(false)
-                });
+                    date: date()
+                };
+                sendReply(this.chatId, message, callback);
             },
             afterPost(flag) {
                 if (flag) {

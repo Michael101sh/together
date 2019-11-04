@@ -195,7 +195,7 @@
                        required>
             </div>
             <input class="submitForm required-field" type="submit" value="שלח/י"
-                   v-on:click="sendPass">
+                   v-on:click="sendPassword">
         </form>
         <br>
         <p>
@@ -213,6 +213,7 @@
     import * as $ from "jquery";
     import { store } from '../store.js';
     import swal from 'sweetalert2'
+    import {addUser, isExists, loginRequest, sendPass} from "../services/user.service.js";
 
     export default {
 
@@ -257,38 +258,16 @@
             }
         },
         methods: {
-            signUpFormOn () {
+            signUpFormOn() {
                 this.showPassRecover = false;
                 this.rampUp = 'register'
             },
 
-            signInFormOn () {
+            signInFormOn() {
                 this.showPassRecover = false;
                 this.rampUp = 'login'
             },
-            addUser () {
-                $.ajax({
-                    url: 'http://' +
-                    location.hostname + ':3003/api/registerUser',
-                    type:"POST",
-                    data:JSON.stringify(this.user),
-                    contentType:"application/json; charset=utf-8",
-                    dataType:"json"
-                }).done(function (){
-                    swal(
-                        '!נרשמת בהצלחה',
-                        'המתן/המתיני לאישור הורים',
-                        'success'
-                    )
-                }).fail(function () {
-                    swal(
-                        '...אופס',
-                        '.ההרשמה לא הצליחה, נסה/י שוב',
-                        'error'
-                    )
-                });
-            },
-            emailValidate () {
+            emailValidate() {
                 let email = this.user.email;
                 let regex1 = /^\w+@[a-zA-Z]+\.com$/;
                 let regex2 = /^\w+@[a-zA-Z]+\.co.il$/;
@@ -304,7 +283,7 @@
                 }
                 return this.emailGreenOn;
             },
-            phoneValidate () {
+            phoneValidate() {
                 let regex = /^0[0-9]{1,2}-?[0-9]{7}$/;
                 this.phoneGreenOn = regex.exec(this.user.phone);
                 if (this.user.phone !== '') {
@@ -316,13 +295,13 @@
                 }
                 return this.phoneGreenOn;
             },
-            nameValidate () {
+            nameValidate() {
                 this.nameGreenOn = !!this.user.name;
                 this.nameErrorMessage = this.nameGreenOn ? '' :
                     "נא רשמ/י את שמך";
                 return this.nameGreenOn;
             },
-            ageValidate () {
+            ageValidate() {
                 let regex = /^([5-9]|([1-9][0-9])){1}$/;
                 this.ageGreenOn = regex.exec(this.user.age);
                 if (this.user.age !== '') {
@@ -344,18 +323,14 @@
                 this.nicknameErrorMessage = this.nicknameGreenOn ? '' :
                     "נא מלא/י כינוי. הכינוי ישמש אותך באפליקציה";
                 if (this.nicknameGreenOn) {
-                    $.ajax({
-                        url: 'http://' +
-                        location.hostname + ':3003/api/isExist',
-                        type: "POST",
-                        data: JSON.stringify(this.user),
-                        contentType: "application/json; charset=utf-8",
-                        dataType: "json"
-                    }).then(res => {
-                        if (res !== 'Ok') {
+                    isExists(this.user)
+                    .then((res) => {
+                        if (res.data !== 'Ok') {
                             this.nicknameErrorMessage = "הכינוי תפוס. נסה/י כינוי אחר";
                             this.nicknameGreenOn = false
-                        }})
+                        }
+                    })
+                    .catch(err => console.log(err));
                 }
                 return this.nicknameGreenOn;
             },
@@ -376,43 +351,39 @@
                 this.user.icon = path.substring(index);
             },
             login() {
-                $.ajax({
-                    url: 'http://' +
-                    location.hostname + ':3003/api/login',
-                    type:"POST",
-                    data:JSON.stringify(this.existUser),
-                    contentType:"application/json; charset=utf-8",
-                    dataType:"json"
-                }).done(function (data){
-                    if(data.error) {
+                const res = loginRequest(this.existUser);
+                 res.then(function (resData) {
+                    if(resData.data.error) {
                         swal(
                             '...אופס',
                             '.כינוי או סיסמא לא נכונים',
                             'error'
-                        )
-                    } else if(data.isVerified) {
-                        store.commit('setUser', data);
-                        if (data.isPsychologist) {
-                            location.href = '#/psyHome'
-                        } else {
-                            location.href = '#/home'
-                        }
+                        )   
+                    } else if(resData.data.isVerified) {
+                            store.commit('setUser', resData.data);
+                            if (resData.data.isPsychologist) {
+                                location.href = '#/psyHome'
+                            } else {
+                                location.href = '#/home'
+                            }
                     } else {
+                            swal(
+                                '...אופס',
+                                '.עוד לא קיבלת אישור הורים.',
+                                'error'
+                            )
+                        }
+                    })
+                    .catch(function (err) {
+                        console.log(err);
                         swal(
                             '...אופס',
-                            '.עוד לא קיבלת אישור הורים.',
+                            '.הכניסה לא הצליחה, נסה/י שוב.',
                             'error'
-                        )
-                    }
-                }).fail(function () {
-                    swal(
-                        '...אופס',
-                        '.הכניסה לא הצליחה, נסה/י שוב.',
-                        'error'
-                    );
-                });
+                        );
+                    });
             },
-            registerFormValidation () {
+            registerFormValidation() {
                 if (this.user.email === '' && this.user.phone === '') {
                     swal('נא מלא/י אימייל או פלאפון / טלפון');
                     return false;
@@ -451,10 +422,10 @@
                         'נא מלא/י סיסמא. הסיסמא תשמש אותך באפליקציה';
                     return false;
                 }
-                this.addUser();
+                addUser(this.user, this.resetUserFields);
                 this.rampUp = '';
             },
-            loginFormValidation () {
+            loginFormValidation() {
                 if (this.existUser.nickname === '') {
                     return false
                 }
@@ -463,42 +434,25 @@
                 }
                 return this.login();
             },
-            showPassRecoverArea () {
+            showPassRecoverArea() {
               this.showPassRecover = !this.showPassRecover;
             },
-            sendPass() {
-                $.ajax({
-                    url: 'http://' +
-                    location.hostname + ':3003/api/sendPass',
-                    type: "POST",
-                    data: JSON.stringify(
-                        {
-                            email: this.emailForRecover,
-                            nickname: this.nicknameForRecover
-                        }),
-                    contentType: "application/json; charset=utf-8",
-                    dataType: "json"
-                }).done(function (res) {
-                    if (res === 'Ok') {
-                        swal(
-                            'הסיסמא נשלחה למייל שלך',
-                            '',
-                            'success'
-                        );
-                    } else {
-                        swal(
-                            '...אופס',
-                            'הכינוי או כתובת המייל לא קיימים במערכת',
-                            'error'
-                        );
-                    }
-                }).fail(function () {
-                    swal(
-                        '...אופס',
-                        'השחזור לא הצליח, נסה/י שוב מאוחר יותר',
-                        'error'
-                    );
-                });
+            sendPassword() {
+                sendPass(this.emailForRecover, this.nicknameForRecover)
+            },
+            resetUserFields() {
+                let resetUser = {
+                    email: '',
+                    phone: '',
+                    name: '',
+                    age: '',
+                    gender: '',
+                    nickname: '',
+                    psw: '',
+                    icon: '',
+                    isVerified: false
+                };
+                this.user = Object.assign({}, resetUser);
             }
         }
     }
