@@ -162,16 +162,13 @@
                        v-model="existUser.psw"
                        required>
             </div>
-            <input class="submitForm required-field" type="submit" value="היכנס/י"
+            <input class="submitForm container" type="submit" value="היכנס/י"
                    v-on:click="loginFormValidation">
-
-            <div class="container">
-                <br>
-                <span class="psw" v-on:click="showPassRecoverArea">
-                    שכחת את הסיסמא שלך?
-                    <u>לחצ/י כאן</u>
-                </span>
-            </div>
+            <br>
+            <span class="psw" v-on:click="showPassRecoverArea">
+                שכחת את הסיסמא שלך?
+                <u>לחצ/י כאן</u>
+            </span>
         </form>
         <form v-on:submit.prevent
               v-show="showPassRecover === true">
@@ -467,7 +464,7 @@
                 return this.login();
             },
             showPassRecoverArea () {
-              this.showPassRecover = true;
+              this.showPassRecover = !this.showPassRecover;
             },
             sendPass() {
                 $.ajax({
@@ -630,6 +627,10 @@
     label.required-field::before, label.required-field2::before {
         content: "*";
         float: left;
+        color: red;
+    }
+
+    .psw {
         color: red;
     }
 
